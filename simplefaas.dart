@@ -39,13 +39,13 @@ main(List<String> args) async {
   final debug = argResults['debug'];
   final allowedProgram = argResults['exec'] as List<String>?;
   final allowedPath = argResults['path'] as List<String>?;
-  final defaultPort = int.tryParse(argResults['port'] ?? '3000') ?? 3000;
   final timeOut = int.tryParse(argResults['timeout']) ?? 300;
-  final prefix = argResults['prefix'];
+  final prefix = argResults['prefix'].toString();
   final fileSupport = argResults['file-support'];
   final allowOrigin = argResults['allow-origin'];
   final hasAllowOrigin = allowOrigin != '';
-  final server = Alfred();
+  final port = int.tryParse(argResults['port']) ?? 3000;
+  final app = Alfred();
 
   if (argResults['config'] != '') {
     final f = File(argResults['config']);
@@ -67,14 +67,39 @@ main(List<String> args) async {
 
   print(configListString);
 
-  /* for (final i in argResults['static']) {
+  final cookiePath = prefix.length == 0 ? "/" : prefix;
+
+  bool setCookie(HttpRequest req,HttpResponse res,String name, String value){
+    var found = false;
+    print(res.cookies.length);
+    for(var cookie in req.cookies){
+      print(cookie);
+      print("iii");
+      if(cookie.name == name){
+        found = true;
+        return found;
+      }
+    }
+    final cookie = Cookie(name, value);
+    cookie.path = cookiePath;
+    res.cookies.add(cookie);
+    return found;
+    }
+
+  app.all('*', (req, res) {
+    final isNew = setCookie(req,res, 'cid', uuidGenerator.v4());
+    print(isNew);
+  });
+
+  for (final i in argResults['static']) {
     final s = i.toString();
     final pos = s.indexOf('=');
     print("$prefix,${s.substring(0, pos)}, ${s.substring(pos + 1)}");
-    server.staticFiles(prefix + s.substring(0, pos), s.substring(pos + 1));
-  } */
+    app.get(prefix + s.substring(0, pos),
+        (req, res) => Directory(s.substring(pos + 1)));
+  }
 
-  server.post(prefix + '/runsync', (req, res) async {
+  app.post(prefix + '/runsync', (req, res) async {
     final body = (await req.body)!;
     Map<String, dynamic> jsonMap = json.decode(body as String);
     final program = jsonMap['program'] ?? "";
@@ -105,7 +130,7 @@ main(List<String> args) async {
     }
   });
 
-  server.post(prefix + '/run', (req, res) async {
+  app.post(prefix + '/run', (req, res) async {
     final body = (await req.body)!;
     Map<String, dynamic> jsonMap = json.decode(body as String);
     final uuid = uuidGenerator.v4();
@@ -148,10 +173,10 @@ main(List<String> args) async {
     return {"uuid": uuid};
   });
 
-  server.get(prefix + '/run/', (req, res) async {
+  app.get(prefix + '/run/', (req, res) async {
     return {"uuid": processResult.keys.toList()};
   });
-  server.get(prefix + '/run/:uuid', (req, res) async {
+  app.get(prefix + '/run/:uuid', (req, res) async {
     final String? uuid = req.params['uuid'];
     if (uuid == 'not found') {
       return {"error": "not found"};
@@ -172,7 +197,7 @@ main(List<String> args) async {
   });
 
   if (fileSupport) {
-    server.get(prefix + '/file', (req, res) async {
+    app.get(prefix + '/file', (req, res) async {
       final filePath = req.uri.queryParameters['path']!;
 
       final f = File(filePath);
@@ -186,7 +211,7 @@ main(List<String> args) async {
       }
     });
 
-    server.post(prefix + '/file', (req, res) async {
+    app.post(prefix + '/file', (req, res) async {
       final body = (await req.body)!;
       Map<String, dynamic> jsonMap = json.decode(body as String);
       final filePath = jsonMap['path'].toString();
@@ -211,7 +236,7 @@ main(List<String> args) async {
       return {"error": 'Not allowed to update/create file.'};
     });
 
-    server.delete(prefix + '/file', (req, res) async {
+    app.delete(prefix + '/file', (req, res) async {
       final body = (await req.body)!;
       Map<String, dynamic> jsonMap = json.decode(body as String);
       final filePath = jsonMap['path'].toString();
@@ -235,5 +260,5 @@ main(List<String> args) async {
     });
   }
 
-  server.listen();
+  app.listen(port);
 }
