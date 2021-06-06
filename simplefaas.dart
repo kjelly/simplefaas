@@ -71,10 +71,7 @@ main(List<String> args) async {
 
   bool setCookie(HttpRequest req,HttpResponse res,String name, String value){
     var found = false;
-    print(res.cookies.length);
     for(var cookie in req.cookies){
-      print(cookie);
-      print("iii");
       if(cookie.name == name){
         found = true;
         return found;
@@ -88,7 +85,6 @@ main(List<String> args) async {
 
   app.all('*', (req, res) {
     final isNew = setCookie(req,res, 'cid', uuidGenerator.v4());
-    print(isNew);
   });
 
   for (final i in argResults['static']) {
